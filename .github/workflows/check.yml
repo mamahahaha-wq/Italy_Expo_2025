@@ -40,7 +40,7 @@ jobs:
           git add feed.xml seen.json
           if ! git diff --cached --quiet; then
             git commit -m "Update RSS/feed at $(date -u '+%Y-%m-%dT%H:%M:%SZ')"
-            git push origin main
+            git push
           else
             echo "No changes to commit"
           fi
