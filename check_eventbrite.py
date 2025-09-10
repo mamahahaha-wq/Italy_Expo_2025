@@ -26,12 +26,10 @@ def fetch_page(url):
 def extract_event_links(html, base_url):
     soup = BeautifulSoup(html, "html.parser")
     links = {}
-    # Eventbrite イベントのリンクは /e/ を含むことが多いのでこれを拾う
     for a in soup.find_all("a", href=True):
         href = a["href"]
         if "/e/" in href:
             full = urljoin(base_url, href)
-            # remove query fragments for uniqueness
             parsed = urlparse(full)
             normalized = parsed.scheme + "://" + parsed.netloc + parsed.path
             title = (a.get_text() or "").strip()
@@ -44,14 +42,13 @@ def load_seen():
     if os.path.exists(SEEN_FILE):
         with open(SEEN_FILE, "r", encoding="utf-8") as f:
             return json.load(f)
-    return []
+    return {}  # 空の辞書
 
-def save_seen(seen):
+def save_seen(seen_dict):
     with open(SEEN_FILE, "w", encoding="utf-8") as f:
-        json.dump(seen, f, ensure_ascii=False, indent=2)
+        json.dump(seen_dict, f, ensure_ascii=False, indent=2)
 
 def make_rss(items):
-    # items: list of dict {link, title, pubDate}
     now = datetime.utcnow().strftime("%a, %d %b %Y %H:%M:%S GMT")
     rss_items = []
     for it in items:
@@ -77,36 +74,35 @@ def make_rss(items):
         f.write(rss)
 
 def escape_xml(s):
-    # minimal xml escape
     return (s.replace("&","&amp;").replace("<","&lt;")
               .replace(">","&gt;").replace('"',"&quot;").replace("'", "&apos;"))
 
 def main():
     html = fetch_page(PAGE_URL)
     links = extract_event_links(html, PAGE_URL)
-    seen = load_seen()
-    seen_set = set(seen)
+    seen_dict = load_seen()  # {link: first_seen_datetime}
     new_links = []
+
+    # 新しいリンクを追加
     for link, title in links.items():
-        if link not in seen_set:
-            # optional: fetch event page to get better title/description (omitted for speed)
-            new_links.append({"link": link, "title": title or link, "pubDate": datetime.utcnow().strftime("%a, %d %b %Y %H:%M:%S GMT")})
-            seen_set.add(link)
+        if link not in seen_dict:
+            seen_dict[link] = datetime.utcnow().strftime("%a, %d %b %Y %H:%M:%S GMT")
+            new_links.append({"link": link, "title": title or link})
+
+    # RSS を常に生成
+    all_items = []
+    for link in reversed(list(seen_dict.keys())):  # 最新が上
+        title = links.get(link, link)
+        pubDate = seen_dict[link]
+        all_items.append({"link": link, "title": title, "pubDate": pubDate})
+
+    make_rss(all_items)
+    save_seen(seen_dict)
+
     if new_links:
-        # prepend new items so newest first
-        # load existing RSS items? we'll rebuild RSS from seen_set's links minimally
-        # For simplicity: create RSS from seen_set with available titles from links dict
-        all_items = []
-        # show newest first
-        for link in reversed(list(seen_set)):
-            t = links.get(link, link)
-            all_items.append({"link": link, "title": t, "pubDate": datetime.utcnow().strftime("%a, %d %b %Y %H:%M:%S GMT")})
-        make_rss(all_items)
-        save_seen(list(seen_set))
         print(f"Found {len(new_links)} new link(s). RSS updated: {RSS_FILE}")
-        # Exit code 0 means success; we could also send notifications from CI (see workflow)
     else:
-        print("No new links.")
+        print("No new links, but RSS regenerated.")
 
 if __name__ == "__main__":
     main()
