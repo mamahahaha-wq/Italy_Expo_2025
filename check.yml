@@ -2,7 +2,7 @@ name: Check Eventbrite and update RSS
 
 on:
   schedule:
-    - cron: '0 * * * *'  # 毎時 0分に実行（好きに変更してください）
+    - cron: '27 * * * *'  # 毎時 27分に実行
   workflow_dispatch: {}
 
 jobs:
@@ -43,3 +43,4 @@ jobs:
           else
             echo "No new events — no Slack message."
           fi
+
