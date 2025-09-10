@@ -2,7 +2,7 @@ name: Check Eventbrite and update RSS
 
 on:
   schedule:
-    - cron: '0 * * * *'  # 毎時 0分に実行（好きに変更してください）
+    - cron: '2 * * * *'  # 毎時 0分に実行（好きに変更してください）
   workflow_dispatch: {}
 
 jobs:
