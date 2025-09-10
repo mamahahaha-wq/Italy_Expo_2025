@@ -10,11 +10,11 @@ jobs:
     runs-on: ubuntu-latest
 
     steps:
-      # リポジトリをチェックアウト（GITHUB_TOKEN 使用）
+      # リポジトリをチェックアウト（PAT を使用）
       - name: Checkout repository
         uses: actions/checkout@v4
         with:
-          token: ${{ secrets.GITHUB_TOKEN }}
+          token: ${{ secrets.PAT_TOKEN }}
 
       # Python をセットアップ
       - name: Set up Python
@@ -39,8 +39,21 @@ jobs:
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
           git add feed.xml seen.json
           if ! git diff --cached --quiet; then
-            git commit -m "Update RSS/feed at $(date -u +"%Y-%m-%dT%H:%M:%SZ")"
+            git commit -m "Update RSS/feed at $(date -u '+%Y-%m-%dT%H:%M:%SZ')"
             git push origin main
           else
             echo "No changes to commit"
+          fi
+
+      # Slack 通知（任意）
+      - name: Notify Slack
+        if: always() && env.SLACK_WEBHOOK != ''
+        env:
+          SLACK_WEBHOOK: ${{ secrets.SLACK_WEBHOOK }}
+        run: |
+          git add feed.xml
+          if ! git diff --cached --quiet; then
+            curl -s -X POST -H 'Content-type: application/json' --data "{\"text\":\"New Event(s) found -> feed updated: ${GITHUB_SERVER_URL}/${GITHUB_REPOSITORY}/blob/${GITHUB_REF}/feed.xml\"}" "$SLACK_WEBHOOK"
+          else
+            echo "No new events — no Slack message."
           fi
