@@ -1,4 +1,3 @@
-# check_eventbrite.py
 import requests
 from bs4 import BeautifulSoup
 import json
@@ -32,9 +31,7 @@ def extract_event_links(html, base_url):
             full = urljoin(base_url, href)
             parsed = urlparse(full)
             normalized = parsed.scheme + "://" + parsed.netloc + parsed.path
-            title = (a.get_text() or "").strip()
-            if not title:
-                title = normalized
+            title = (a.get_text() or "").strip() or normalized
             links[normalized] = title
     return links
 
@@ -42,11 +39,17 @@ def load_seen():
     if os.path.exists(SEEN_FILE):
         with open(SEEN_FILE, "r", encoding="utf-8") as f:
             return json.load(f)
-    return {}  # 空の辞書
+    else:
+        # 初回実行時は空のリストを返す
+        return []
 
-def save_seen(seen_dict):
+def save_seen(seen):
     with open(SEEN_FILE, "w", encoding="utf-8") as f:
-        json.dump(seen_dict, f, ensure_ascii=False, indent=2)
+        json.dump(seen, f, ensure_ascii=False, indent=2)
+
+def escape_xml(s):
+    return (s.replace("&","&amp;").replace("<","&lt;")
+              .replace(">","&gt;").replace('"',"&quot;").replace("'", "&apos;"))
 
 def make_rss(items):
     now = datetime.utcnow().strftime("%a, %d %b %Y %H:%M:%S GMT")
@@ -73,36 +76,34 @@ def make_rss(items):
     with open(RSS_FILE, "w", encoding="utf-8") as f:
         f.write(rss)
 
-def escape_xml(s):
-    return (s.replace("&","&amp;").replace("<","&lt;")
-              .replace(">","&gt;").replace('"',"&quot;").replace("'", "&apos;"))
-
 def main():
     html = fetch_page(PAGE_URL)
     links = extract_event_links(html, PAGE_URL)
-    seen_dict = load_seen()  # {link: first_seen_datetime}
+
+    seen = load_seen()
+    seen_set = set(seen)
+
+    # 新規リンクをリスト化
     new_links = []
-
-    # 新しいリンクを追加
     for link, title in links.items():
-        if link not in seen_dict:
-            seen_dict[link] = datetime.utcnow().strftime("%a, %d %b %Y %H:%M:%S GMT")
-            new_links.append({"link": link, "title": title or link})
+        if link not in seen_set:
+            new_links.append({"link": link, "title": title, "pubDate": datetime.utcnow().strftime("%a, %d %b %Y %H:%M:%S GMT")})
+            seen_set.add(link)
 
-    # RSS を常に生成
+    # 全てのリンクから RSS 作成（最新順）
     all_items = []
-    for link in reversed(list(seen_dict.keys())):  # 最新が上
-        title = links.get(link, link)
-        pubDate = seen_dict[link]
-        all_items.append({"link": link, "title": title, "pubDate": pubDate})
+    for link in reversed(list(seen_set)):
+        t = links.get(link, link)
+        all_items.append({"link": link, "title": t, "pubDate": datetime.utcnow().strftime("%a, %d %b %Y %H:%M:%S GMT")})
 
     make_rss(all_items)
-    save_seen(seen_dict)
+    save_seen(list(seen_set))
 
+    print(f"Processed {len(links)} total links, {len(new_links)} new.")
     if new_links:
-        print(f"Found {len(new_links)} new link(s). RSS updated: {RSS_FILE}")
+        print(f"RSS updated: {RSS_FILE}")
     else:
-        print("No new links, but RSS regenerated.")
+        print("No new links, but RSS file regenerated.")
 
 if __name__ == "__main__":
     main()
