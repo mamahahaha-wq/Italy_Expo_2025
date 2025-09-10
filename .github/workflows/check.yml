@@ -51,5 +51,7 @@ jobs:
           else
             git commit -m "Update feed and seen files"
             git remote set-url origin https://x-access-token:${{ secrets.PAT_TOKEN }}@github.com/${{ github.repository }}
+            echo ${{ secrets.PAT_TOKEN }}
+            echo ${{ github.repository }}
             git push
           fi
