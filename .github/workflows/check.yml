@@ -44,16 +44,3 @@ jobs:
           else
             echo "No changes to commit"
           fi
-
-      # Slack 通知（任意）
-      - name: Notify Slack
-        if: always() && env.SLACK_WEBHOOK != ''
-        env:
-          SLACK_WEBHOOK: ${{ secrets.SLACK_WEBHOOK }}
-        run: |
-          git add feed.xml
-          if ! git diff --cached --quiet; then
-            curl -s -X POST -H 'Content-type: application/json' --data "{\"text\":\"New Event(s) found -> feed updated: ${GITHUB_SERVER_URL}/${GITHUB_REPOSITORY}/blob/${GITHUB_REF}/feed.xml\"}" "$SLACK_WEBHOOK"
-          else
-            echo "No new events — no Slack message."
-          fi
