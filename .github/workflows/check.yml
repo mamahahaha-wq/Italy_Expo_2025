@@ -50,8 +50,6 @@ jobs:
             echo "No changes to commit"
           else
             git commit -m "Update feed and seen files"
-            git remote set-url origin https://x-access-token:${{ secrets.PAT_TOKEN }}@github.com/${{ github.repository }}
-            echo ${{ secrets.PAT_TOKEN }}
-            echo ${{ github.repository }}
+            git remote set-url origin https://x-access-token:${{ secrets.PAT_TOKEN }}@github.com/mamahahaha-wq/Italy_Expo_2025
             git push
           fi
