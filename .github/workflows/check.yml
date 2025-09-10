@@ -8,16 +8,8 @@ on:
 jobs:
   build:
     permissions:
-      actions: write
-      checks: write
       contents: write
-      deployments: write
-      issues: write
-      packages: write
-      pull-requests: write
-      repository-projects: write
-      security-events: write
-      statuses: write
+      # 他の権限は不要なら削除可能
     runs-on: ubuntu-latest
 
     steps:
@@ -26,8 +18,9 @@ jobs:
         uses: actions/checkout@v4
         with:
           token: ${{ secrets.PAT_TOKEN }}
+          persist-credentials: false  # push 時に PAT を使えるようにする
 
-      # Python をセットアップ
+      # Python セットアップ
       - name: Set up Python
         uses: actions/setup-python@v4
         with:
@@ -37,22 +30,26 @@ jobs:
       - name: Install dependencies
         run: |
           python -m pip install --upgrade pip
-          pip install requests beautifulsoup4
+          if [ -f requirements.txt ]; then
+            pip install -r requirements.txt
+          else
+            pip install requests beautifulsoup4
+          fi
 
       # スクリプト実行
-      - name: Run checker
+      - name: Run Eventbrite checker
         run: python check_eventbrite.py
 
       # 変更があればコミット & push
-      - name: Commit RSS if changed
+      - name: Commit and push RSS if changed
         run: |
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
           git add feed.xml seen.json
-          if ! git diff --cached --quiet; then
-            git commit -m "Update feed and seen files" || echo "No changes to commit"
-            git remote set-url origin https://x-access-token:${GITHUB_TOKEN}@github.com/${{ github.repository }}
-            git push
-          else
+          if git diff --exit-code --cached; then
             echo "No changes to commit"
+          else
+            git commit -m "Update feed and seen files"
+            git remote set-url origin https://x-access-token:${{ secrets.PAT_TOKEN }}@github.com/${{ github.repository }}
+            git push
           fi
