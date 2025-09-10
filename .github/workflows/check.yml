@@ -50,7 +50,8 @@ jobs:
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
           git add feed.xml seen.json
           if ! git diff --cached --quiet; then
-            git commit -m "Update RSS/feed at $(date -u '+%Y-%m-%dT%H:%M:%SZ')"
+            git commit -m "Update feed and seen files" || echo "No changes to commit"
+            git remote set-url origin https://x-access-token:${GITHUB_TOKEN}@github.com/${{ github.repository }}
             git push
           else
             echo "No changes to commit"
