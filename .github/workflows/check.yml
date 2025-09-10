@@ -2,45 +2,58 @@ name: Check Eventbrite and update RSS
 
 on:
   schedule:
-    - cron: '2 * * * *'  # 毎時 0分に実行（好きに変更してください）
-  workflow_dispatch: {}
+    - cron: '2 * * * *'  # 毎時2分に実行
+  workflow_dispatch:     # 手動実行も可能
 
 jobs:
   build:
     runs-on: ubuntu-latest
+
     steps:
-      - uses: actions/checkout@v4
+      # リポジトリをチェックアウト（GITHUB_TOKEN 使用）
+      - name: Checkout repository
+        uses: actions/checkout@v4
+        with:
+          token: ${{ secrets.GITHUB_TOKEN }}
+
+      # Python をセットアップ
       - name: Set up Python
         uses: actions/setup-python@v4
         with:
           python-version: "3.11"
-          token: ${{ secrets.GITHUB_TOKEN }}
-      - name: Install deps
+
+      # 依存関係インストール
+      - name: Install dependencies
         run: |
           python -m pip install --upgrade pip
           pip install requests beautifulsoup4
+
+      # スクリプト実行
       - name: Run checker
-        run: |
-          python check_eventbrite.py
+        run: python check_eventbrite.py
+
+      # 変更があればコミット & push
       - name: Commit RSS if changed
         run: |
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
-          if ! git diff --quiet --exit-code; then
-            git add feed.xml seen.json || true
-            git commit -m "Update RSS/feed at $(date -u +"%Y-%m-%dT%H:%M:%SZ")" || echo "commit failed"
+          git add feed.xml seen.json
+          # ステージされた差分がある場合のみ commit & push
+          if ! git diff --cached --quiet; then
+            git commit -m "Update RSS/feed at $(date -u +"%Y-%m-%dT%H:%M:%SZ")"
             git push origin main
           else
             echo "No changes to commit"
-          fi
-      - name: Notify Slack (optional)
+
+      # Slack 通知（任意）
+      - name: Notify Slack
         if: always() && env.SLACK_WEBHOOK != ''
         env:
           SLACK_WEBHOOK: ${{ secrets.SLACK_WEBHOOK }}
         run: |
-          # If feed.xml was updated, send a short message
-          if ! git diff --quiet --exit-code -- feed.xml; then
+          # feed.xml が更新された場合のみ通知
+          git add feed.xml
+          if ! git diff --cached --quiet; then
             curl -s -X POST -H 'Content-type: application/json' --data "{\"text\":\"New Event(s) found -> feed updated: ${GITHUB_SERVER_URL}/${GITHUB_REPOSITORY}/blob/${GITHUB_REF}/feed.xml\"}" "$SLACK_WEBHOOK"
           else
             echo "No new events — no Slack message."
-          fi
